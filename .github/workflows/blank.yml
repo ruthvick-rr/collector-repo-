@@ -1,7 +1,7 @@
 name: Email Daily Commit Report
 
 on:
-  workflow_dispatch:  # Manual trigger for now; can be switched to schedule later
+  workflow_dispatch:  # Manual trigger for now
 
 jobs:
   email-report:
@@ -11,47 +11,47 @@ jobs:
       - name: Checkout collector repository
         uses: actions/checkout@v4
 
-      - name: Combine commit message files from directory
+      - name: Combine commit message files
         id: generate
         run: |
-          echo "Collecting all commit message files from 'commit-messages-Date*' directories..."
+          echo "Collecting commit message files..."
           mkdir -p reports
 
-          # Find the most recent directory that matches "commit-messages-Date*"
+          # Find latest directory that matches pattern
           LATEST_DIR=$(ls -td commit-messages-Date* 2>/dev/null | head -n 1)
 
           if [ -z "$LATEST_DIR" ]; then
-            echo "❌ No commit message directory found. Exiting."
-            exit 0
-          fi
+            echo "❌ No commit message directory found."
+            REPORT_FILE="reports/empty_report_$(date +'%Y-%m-%d_%H-%M').txt"
+            echo "No commit messages found to include." > "$REPORT_FILE"
+          else
+            REPORT_FILE="reports/combined_commits_${LATEST_DIR}_$(date +'%Y-%m-%d_%H-%M').txt"
 
-          REPORT_FILE="reports/combined_commits_${LATEST_DIR}_$(date +'%Y-%m-%d_%H-%M').txt"
+            echo "🧾 Combined Commit Report" > "$REPORT_FILE"
+            echo "Directory: $LATEST_DIR" >> "$REPORT_FILE"
+            echo "Generated at: $(date)" >> "$REPORT_FILE"
+            echo "" >> "$REPORT_FILE"
 
-          echo "🧾 Combined Commit Report" > "$REPORT_FILE"
-          echo "Directory: $LATEST_DIR" >> "$REPORT_FILE"
-          echo "Generated at: $(date)" >> "$REPORT_FILE"
-          echo "" >> "$REPORT_FILE"
+            FILES_FOUND=false
+            for file in "$LATEST_DIR"/*.txt; do
+              if [ -f "$file" ]; then
+                FILES_FOUND=true
+                echo "===============================" >> "$REPORT_FILE"
+                echo "📦 Repo File: $(basename "$file")" >> "$REPORT_FILE"
+                echo "-------------------------------" >> "$REPORT_FILE"
+                cat "$file" >> "$REPORT_FILE"
+                echo "" >> "$REPORT_FILE"
+              fi
+            done
 
-          FILES_FOUND=false
-
-          for file in "$LATEST_DIR"/*.txt; do
-            if [ -f "$file" ]; then
-              FILES_FOUND=true
-              echo "===============================" >> "$REPORT_FILE"
-              echo "📦 Repo File: $(basename "$file")" >> "$REPORT_FILE"
-              echo "-------------------------------" >> "$REPORT_FILE"
-              cat "$file" >> "$REPORT_FILE"
-              echo "" >> "$REPORT_FILE"
+            if [ "$FILES_FOUND" = false ]; then
+              echo "⚠️ No .txt commit files found inside $LATEST_DIR." >> "$REPORT_FILE"
             fi
-          done
-
-          if [ "$FILES_FOUND" = false ]; then
-            echo "⚠️ No .txt commit message files found inside $LATEST_DIR." >> "$REPORT_FILE"
           fi
 
-          echo "REPORT_FILE=$REPORT_FILE" >> $GITHUB_OUTPUT
+          echo "REPORT_FILE=$REPORT_FILE" >> $GITHUB_ENV  # ✅ set as env var for next step
 
-      - name: Send combined report by email
+      - name: Send Combined Report by Email
         uses: dawidd6/action-send-mail@v3
         with:
           server_address: smtp.gmail.com
@@ -68,4 +68,4 @@ jobs:
             — GitHub Autopromotion Bot 🤖
           to: "ruthvick.ravu@gmail.com"
           from: "GitHub Commit Reporter <ruthvicktest@gmail.com>"
-          attachments: ${{ steps.generate.outputs.REPORT_FILE }}
+          attachments: ${{ env.REPORT_FILE }}
