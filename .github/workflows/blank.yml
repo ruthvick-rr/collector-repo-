@@ -60,6 +60,6 @@ jobs:
             from multiple repositories.
 
             — GitHub Autopromotion Bot 🤖
-          to: "noreply@devopstechsophy.com"
+          to: "ruthvick.ravu@gmail.com"
           from: "GitHub Commit Reporter <noreply@devopstechsophy.com>"
           attachments: ${{ steps.generate.outputs.REPORT_FILE }}
