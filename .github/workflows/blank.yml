@@ -1,37 +1,44 @@
-# This is a basic workflow to help you get started with Actions
-
-name: Email Combined Commit Report (Manual Test)
+name: Email Daily Commit Report
 
 on:
-  workflow_dispatch:
+  workflow_dispatch:  # Manual trigger for now; can be switched to schedule later
 
 jobs:
   email-report:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout collector repo
+      - name: Checkout collector repository
         uses: actions/checkout@v4
 
-      - name: Combine commit message files (root level)
+      - name: Combine commit message files from directory
         id: generate
         run: |
-          echo "Combining all commit message files from repo root..."
+          echo "Collecting all commit message files from 'commit-messages-Date*' directories..."
           mkdir -p reports
 
-          REPORT_FILE="reports/test_combined_commits_$(date +'%Y-%m-%d_%H-%M').txt"
+          # Find the most recent directory that matches "commit-messages-Date*"
+          LATEST_DIR=$(ls -td commit-messages-Date* 2>/dev/null | head -n 1)
+
+          if [ -z "$LATEST_DIR" ]; then
+            echo "❌ No commit message directory found. Exiting."
+            exit 0
+          fi
+
+          REPORT_FILE="reports/combined_commits_${LATEST_DIR}_$(date +'%Y-%m-%d_%H-%M').txt"
 
           echo "🧾 Combined Commit Report" > "$REPORT_FILE"
+          echo "Directory: $LATEST_DIR" >> "$REPORT_FILE"
           echo "Generated at: $(date)" >> "$REPORT_FILE"
           echo "" >> "$REPORT_FILE"
 
           FILES_FOUND=false
 
-          for file in ./*.txt; do
+          for file in "$LATEST_DIR"/*.txt; do
             if [ -f "$file" ]; then
               FILES_FOUND=true
               echo "===============================" >> "$REPORT_FILE"
-              echo "📦 File: $(basename "$file")" >> "$REPORT_FILE"
+              echo "📦 Repo File: $(basename "$file")" >> "$REPORT_FILE"
               echo "-------------------------------" >> "$REPORT_FILE"
               cat "$file" >> "$REPORT_FILE"
               echo "" >> "$REPORT_FILE"
@@ -39,25 +46,24 @@ jobs:
           done
 
           if [ "$FILES_FOUND" = false ]; then
-            echo "⚠️ No .txt commit message files found in the repository root." >> "$REPORT_FILE"
+            echo "⚠️ No .txt commit message files found inside $LATEST_DIR." >> "$REPORT_FILE"
           fi
 
           echo "REPORT_FILE=$REPORT_FILE" >> $GITHUB_OUTPUT
 
-      - name: Send Email with Combined Report
+      - name: Send combined report by email
         uses: dawidd6/action-send-mail@v3
         with:
           server_address: smtp.gmail.com
           server_port: 465
           username: ${{ secrets.EMAIL_USER }}
           password: ${{ secrets.EMAIL_PASS }}
-          subject: "🧾 Test Combined Commit Report"
+          subject: "🧾 Daily Combined Commit Report"
           body: |
             Hi Team,
 
-            Attached is the **test combined commit summary report**
-            containing all commit messages collected in the last 10 minutes
-            from multiple repositories.
+            Please find attached the **daily combined commit report**
+            summarizing all commits collected from the latest autopromotions.
 
             — GitHub Autopromotion Bot 🤖
           to: "ruthvick.ravu@gmail.com"
