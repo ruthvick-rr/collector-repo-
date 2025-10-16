@@ -61,5 +61,5 @@ jobs:
 
             — GitHub Autopromotion Bot 🤖
           to: "ruthvick.ravu@gmail.com"
-          from: "GitHub Commit Reporter <noreply@devopstechsophy.com>"
+          from: "GitHub Commit Reporter <ruthvicktest@gmail.com>"
           attachments: ${{ steps.generate.outputs.REPORT_FILE }}
