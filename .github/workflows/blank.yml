@@ -1,0 +1,65 @@
+# This is a basic workflow to help you get started with Actions
+
+name: Email Combined Commit Report (Manual Test)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  email-report:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout collector repo
+        uses: actions/checkout@v4
+
+      - name: Combine commit message files (root level)
+        id: generate
+        run: |
+          echo "Combining all commit message files from repo root..."
+          mkdir -p reports
+
+          REPORT_FILE="reports/test_combined_commits_$(date +'%Y-%m-%d_%H-%M').txt"
+
+          echo "🧾 Combined Commit Report" > "$REPORT_FILE"
+          echo "Generated at: $(date)" >> "$REPORT_FILE"
+          echo "" >> "$REPORT_FILE"
+
+          FILES_FOUND=false
+
+          for file in ./*.txt; do
+            if [ -f "$file" ]; then
+              FILES_FOUND=true
+              echo "===============================" >> "$REPORT_FILE"
+              echo "📦 File: $(basename "$file")" >> "$REPORT_FILE"
+              echo "-------------------------------" >> "$REPORT_FILE"
+              cat "$file" >> "$REPORT_FILE"
+              echo "" >> "$REPORT_FILE"
+            fi
+          done
+
+          if [ "$FILES_FOUND" = false ]; then
+            echo "⚠️ No .txt commit message files found in the repository root." >> "$REPORT_FILE"
+          fi
+
+          echo "REPORT_FILE=$REPORT_FILE" >> $GITHUB_OUTPUT
+
+      - name: Send Email with Combined Report
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: smtp.gmail.com
+          server_port: 465
+          username: ${{ secrets.EMAIL_USER }}
+          password: ${{ secrets.EMAIL_PASS }}
+          subject: "🧾 Test Combined Commit Report"
+          body: |
+            Hi Team,
+
+            Attached is the **test combined commit summary report**
+            containing all commit messages collected in the last 10 minutes
+            from multiple repositories.
+
+            — GitHub Autopromotion Bot 🤖
+          to: "noreply@devopstechsophy.com"
+          from: "GitHub Commit Reporter <noreply@devopstechsophy.com>"
+          attachments: ${{ steps.generate.outputs.REPORT_FILE }}
