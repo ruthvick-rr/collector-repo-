@@ -18,21 +18,31 @@ jobs:
           repository: ruthvick-rr/collector-repo-
           token: ${{ secrets.AUTOPROMOTION_PAT }}
 
-      - name: Combine commit message files (latest day)
+      - name: Combine commit message files (today's date folder)
         id: generate
         shell: bash
         run: |
-          echo "🔍 Finding latest commit-messages directory..."
-          LATEST_DIR=$(ls -td commit-messages-* 2>/dev/null | head -n 1)
+          # Get today's date in Central Time (CDT)
+          TODAY=$(TZ=America/Chicago date +'%Y-%m-%d')
+          TARGET_DIR="commit-messages-${TODAY}"
 
-          if [ -z "$LATEST_DIR" ]; then
-            echo "❌ No commit message directory found."
+          echo "📅 Target folder for today: $TARGET_DIR"
+
+          if [ ! -d "$TARGET_DIR" ]; then
+            echo "⚠️ Folder $TARGET_DIR not found — using yesterday as fallback."
+            YESTERDAY=$(TZ=America/Chicago date -d "yesterday" +'%Y-%m-%d')
+            TARGET_DIR="commit-messages-${YESTERDAY}"
+          fi
+
+          if [ ! -d "$TARGET_DIR" ]; then
+            echo "❌ No commit message directories found for today or yesterday."
             exit 0
           fi
 
-          echo "📂 Latest commit directory: $LATEST_DIR"
+          echo "📂 Using directory: $TARGET_DIR"
+
           mkdir -p reports
-          REPORT_FILE="reports/combined_commits_$(date +'%Y-%m-%d_%H-%M').txt"
+          REPORT_FILE="reports/combined_commits_${TODAY}.txt"
 
           echo "🧾 Daily Combined Commit Report" > "$REPORT_FILE"
           echo "Generated at: $(date)" >> "$REPORT_FILE"
@@ -40,7 +50,7 @@ jobs:
 
           FILES_FOUND=false
 
-          for file in "$LATEST_DIR"/*.txt; do
+          for file in "$TARGET_DIR"/*.txt; do
             if [ -f "$file" ]; then
               FILES_FOUND=true
               echo "===============================" >> "$REPORT_FILE"
@@ -52,10 +62,10 @@ jobs:
           done
 
           if [ "$FILES_FOUND" = false ]; then
-            echo "⚠️ No .txt commit message files found in $LATEST_DIR." >> "$REPORT_FILE"
+            echo "⚠️ No .txt commit message files found in $TARGET_DIR." >> "$REPORT_FILE"
           fi
 
-          echo "✅ Combined report created at: $REPORT_FILE"
+          echo "✅ Combined report created: $REPORT_FILE"
           echo "REPORT_FILE=$REPORT_FILE" >> $GITHUB_OUTPUT
 
       - name: Send Email with Combined Report
@@ -70,7 +80,7 @@ jobs:
             Hi Team,
 
             Please find attached the **daily combined commit report**
-            covering all repositories from yesterday 7 AM to today 7 AM (Central Time).
+            containing all commits from yesterday 7 AM to today 7 AM (Central Time).
 
             — GitHub Autopromotion Bot 🤖
           to: "ruthvick.ravu@gmail.com"
